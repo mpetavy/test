@@ -7,6 +7,19 @@ import (
 	"time"
 )
 
+func getBroadcast() {
+	mask := net.CIDRMask(24, 32)
+	ip := net.IP([]byte{192, 168, 1, 3})
+
+	broadcast := net.IP(make([]byte, 4))
+	for i := range ip {
+		broadcast[i] = ip[i] | ^mask[i]
+	}
+
+	fmt.Println(broadcast)
+}
+
+
 func main() {
 	c, err := net.ListenPacket("udp", ":0")
 	if err != nil {
