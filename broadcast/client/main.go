@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -49,19 +50,26 @@ func FindActiveIPs() ([]string, error) {
 }
 
 func main() {
+	localIps, err := FindActiveIPs()
+	if err != nil {
+		panic(err)
+	}
+
+	var wg sync.WaitGroup
+
+	discoveredIps := make(chan net.IPNet, len(localIps))
+
 	c, err := net.ListenPacket("udp", ":0")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()
 
-	ips, err := FindActiveIPs()
-	if err != nil {
-		panic(err)
-	}
-
-	for _, foundIp := range ips {
-		ipv4Addr, ipv4Net, err := net.ParseCIDR(foundIp)
+	for _, localIp := range localIps {
+		ipv4Addr, ipv4Net, err := net.ParseCIDR(localIp)
+		if err != nil {
+			panic(err)
+		}
 
 		ipv4Addr = ipv4Addr.To4()
 
@@ -69,40 +77,58 @@ func main() {
 			continue
 		}
 
-		log.Printf("----------------")
-		log.Printf("ip: %v", ipv4Addr)
-		log.Printf("subnet: %v", ipv4Net)
+		wg.Add(1)
 
-		ones, bits := ipv4Net.Mask.Size()
-		mask := net.CIDRMask(ones, bits)
+		go func(ipv4Addr net.IP, ipv4Net *net.IPNet) {
+			defer wg.Done()
 
-		broadcast := net.IP(make([]byte, 4))
-		for i := range ipv4Addr {
-			broadcast[i] = ipv4Addr[i] | ^mask[i]
-		}
+			log.Printf("----------------")
+			log.Printf("ip: %v", ipv4Addr)
+			log.Printf("subnet: %v", ipv4Net)
 
-		log.Printf("broadcast: %v", broadcast.String())
+			ones, bits := ipv4Net.Mask.Size()
+			mask := net.CIDRMask(ones, bits)
 
-		dst, err := net.ResolveUDPAddr("udp", broadcast.String()+":8032")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if _, err := c.WriteTo([]byte("hello from client"), dst); err != nil {
-			log.Fatal(err)
-		}
-		b := make([]byte, 512)
-		c.SetReadDeadline(time.Now().Add(time.Second * 1))
-		for {
-			n, peer, err := c.ReadFrom(b)
-			if err != nil {
-				if err, ok := err.(net.Error); ok && err.Timeout() {
-					break
-				} else {
-					log.Fatal(err)
-				}
+			broadcast := net.IP(make([]byte, 4))
+			for i := range ipv4Addr {
+				broadcast[i] = ipv4Addr[i] | ^mask[i]
 			}
-			log.Printf("%d bytes read from %+v: %s\n", n, peer, string(b[:n]))
+
+			log.Printf("broadcast: %v", broadcast.String())
+
+			dst, err := net.ResolveUDPAddr("udp", broadcast.String()+":8032")
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if _, err := c.WriteTo([]byte("hello from client"), dst); err != nil {
+				log.Fatal(err)
+			}
+		}(ipv4Addr, ipv4Net)
+	}
+
+	wg.Wait()
+
+	log.Printf("reading answers ...")
+
+	b := make([]byte, 512)
+	c.SetReadDeadline(time.Now().Add(time.Second * 1))
+	for {
+		n, peer, err := c.ReadFrom(b)
+		if err != nil {
+			if err, ok := err.(net.Error); ok && err.Timeout() {
+				break
+			} else {
+				log.Fatal(err)
+			}
 		}
+		log.Printf("%d bytes read from %+v: %s\n", n, peer, string(b[:n]))
+	}
+
+	close(discoveredIps)
+
+	for discoveredIp := range discoveredIps {
+
+		log.Printf("discovered ip: %+v", discoveredIp)
 	}
 }
