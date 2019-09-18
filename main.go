@@ -6,11 +6,11 @@ import (
 )
 
 func init() {
-	common.Init("test", "0.0.0", "2018", "test", "mpetavy", common.APACHE, "https://github.com/golang/mpetavy/golang/tresor", true, nil, nil, run, 0)
+	common.Init("0.0.0", "2018", "test", "mpetavy", common.APACHE, true, nil, nil, run, 0)
 }
 
 func run() error {
-	fmt.Printf("title: %s\n",common.Title())
+	fmt.Printf("title: %s\n", common.Title())
 
 	return nil
 }
