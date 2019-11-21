@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/mpetavy/common"
 )
@@ -10,21 +9,28 @@ func init() {
 	common.Init("0.0.0", "2018", "test", "mpetavy", common.APACHE, true, nil, nil, run, 0)
 }
 
-func test(ba *bytes.Buffer) {
-	ba.Reset()
-	ba.WriteString("modified")
-}
-
 func run() error {
-	fmt.Printf("title: %s\n", common.Title())
+	phrase := []byte("1234567890123456")
+	txt, err := common.EncryptString(phrase, "Hello world!")
+	if common.Error(err) {
+		return nil
+	}
 
-	ba := []byte("default")
+	fmt.Printf("%s\n", txt)
 
-	bb := bytes.NewBuffer(ba)
+	txt, err = common.EncryptString(phrase, "Hello world!")
+	if common.Error(err) {
+		return nil
+	}
 
-	test(bb)
+	fmt.Printf("%s\n", txt)
 
-	fmt.Printf("%s\n", bb.String())
+	txt, err = common.DecryptString(phrase, txt)
+	if common.Error(err) {
+		return nil
+	}
+
+	fmt.Printf("%s\n", txt)
 
 	return nil
 }
