@@ -1,8 +1,12 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"github.com/mpetavy/common"
+	"io"
+	"os"
+	"time"
 )
 
 func init() {
@@ -10,27 +14,41 @@ func init() {
 }
 
 func run() error {
-	phrase := []byte("1234567890123456")
-	txt, err := common.EncryptString(phrase, "Hello world!")
+	start := time.Now()
+
+	hash := md5.New()
+
+	f, err := os.Open("/home/ransom/aur/intellij-idea-ultimate-edition/ideaIU-2019.3.tar.gz")
 	if common.Error(err) {
-		return nil
+		return err
 	}
 
-	fmt.Printf("%s\n", txt)
-
-	txt, err = common.EncryptString(phrase, "Hello world!")
+	n, err := common.Stream(hash, f)
 	if common.Error(err) {
-		return nil
+		return err
 	}
 
-	fmt.Printf("%s\n", txt)
+	common.Error(f.Close())
 
-	txt, err = common.DecryptString(phrase, txt)
+	fmt.Printf("%d %v %v\n", n, hash.Sum(nil), time.Now().Sub(start))
+	hash.Reset()
+
+	buf := make([]byte, 32*1024)
+	buf = nil
+
+	f, err = os.Open("/home/ransom/aur/intellij-idea-ultimate-edition/ideaIU-2019.3.tar.gz")
 	if common.Error(err) {
-		return nil
+		return err
 	}
 
-	fmt.Printf("%s\n", txt)
+	n, err = io.CopyBuffer(hash, f, buf)
+	if common.Error(err) {
+		return err
+	}
+
+	common.Error(f.Close())
+
+	fmt.Printf("%d %v %v\n", n, hash.Sum(nil), time.Now().Sub(start))
 
 	return nil
 }
